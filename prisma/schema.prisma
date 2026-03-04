@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 枚举 ====================
+
+enum Role {
+  admin
+  volunteer
+}
+
+enum ActivityStatus {
+  recruiting
+  ongoing
+  completed
+  cancelled
+}
+
+enum RegistrationStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+enum CheckInMethod {
+  qr
+  manual
+  ai
+}
+
+// ==================== 数据模型 ====================
+
+model User {
+  id                 Int              @id @default(autoincrement())
+  username           String           @unique @db.VarChar(50)
+  password           String           @db.VarChar(255)
+  email              String           @unique @db.VarChar(100)
+  phone              String?          @db.VarChar(20)
+  role               Role             @default(volunteer)
+  interest_tags      Json?
+  total_service_hours Float           @default(0)
+  avatar_url         String?          @db.VarChar(255)
+  created_at         DateTime         @default(now())
+  updated_at         DateTime         @updatedAt
+
+  // 关联
+  created_activities Activity[]       @relation("CreatorActivities")
+  registrations      Registration[]
+  check_ins          CheckIn[]
+  service_records    ServiceRecord[]
+
+  @@map("users")
+}
+
+model Activity {
+  id              Int              @id @default(autoincrement())
+  title           String           @db.VarChar(200)
+  description     String           @db.Text
+  ai_description  String?          @db.Text
+  location        String           @db.VarChar(200)
+  start_time      DateTime
+  end_time        DateTime
+  max_volunteers  Int
+  status          ActivityStatus   @default(recruiting)
+  qr_code         String?          @db.Text
+  creator_id      Int
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+
+  // 关联
+  creator         User             @relation("CreatorActivities", fields: [creator_id], references: [id])
+  registrations   Registration[]
+  check_ins       CheckIn[]
+  service_records ServiceRecord[]
+
+  @@map("activities")
+}
+
+model Registration {
+  id            Int                @id @default(autoincrement())
+  user_id       Int
+  activity_id   Int
+  status        RegistrationStatus @default(pending)
+  registered_at DateTime           @default(now())
+
+  // 关联
+  user          User               @relation(fields: [user_id], references: [id])
+  activity      Activity           @relation(fields: [activity_id], references: [id])
+
+  @@unique([user_id, activity_id])
+  @@map("registrations")
+}
+
+model CheckIn {
+  id            Int            @id @default(autoincrement())
+  user_id       Int
+  activity_id   Int
+  check_in_time DateTime       @default(now())
+  method        CheckInMethod  @default(qr)
+  ai_verified   Boolean        @default(false)
+
+  // 关联
+  user          User           @relation(fields: [user_id], references: [id])
+  activity      Activity       @relation(fields: [activity_id], references: [id])
+
+  @@unique([user_id, activity_id])
+  @@map("check_ins")
+}
+
+model ServiceRecord {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  activity_id Int
+  hours       Float
+  location    String   @db.VarChar(200)
+  evaluation  String?  @db.Text
+  rating      Int?
+  created_at  DateTime @default(now())
+
+  // 关联
+  user        User     @relation(fields: [user_id], references: [id])
+  activity    Activity @relation(fields: [activity_id], references: [id])
+
+  @@unique([user_id, activity_id])
+  @@map("service_records")
+}
